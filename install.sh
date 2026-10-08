@@ -39,8 +39,8 @@ command -v "$herdr" >/dev/null 2>&1 || die "herdr is not installed (https://herd
 command -v python3 >/dev/null 2>&1 || die "Herdr Focus needs python3"
 python3 -c 'import sys; sys.exit(sys.version_info < (3, 11))' || die "Herdr Focus needs Python 3.11 or newer"
 
-# Where Herdr keeps the installed or linked plugin.
-plugin_root() {
+# Field of the registered plugin: plugin_info root | plugin_info kind (github or local).
+plugin_info() {
   "$herdr" plugin list --json 2>/dev/null | python3 -c '
 import json, sys
 try:
@@ -49,9 +49,10 @@ except Exception:
     sys.exit(0)
 for p in plugins:
     if p.get("plugin_id") == "focus":
-        print(p.get("plugin_root") or "")
-'
+        print(p.get("plugin_root") or "" if sys.argv[1] == "root" else (p.get("source") or {}).get("kind", ""))
+' "$1"
 }
+plugin_root() { plugin_info root; }
 
 if [ "$uninstall" = 1 ]; then
   root="$(plugin_root)"
@@ -77,6 +78,10 @@ if [ -n "$link" ]; then
   say "Linking $link"
   "$herdr" plugin link "$link" >/dev/null
 else
+  existing="$(plugin_root)"
+  if [ -n "$existing" ] && [ "$(plugin_info kind)" != "github" ]; then
+    die "Focus is linked from $existing. Run $existing/install.sh to update it, or uninstall first."
+  fi
   say "Installing from GitHub ($REPO)"
   "$herdr" plugin install "$REPO" --yes >/dev/null
 fi
