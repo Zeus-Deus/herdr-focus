@@ -152,9 +152,27 @@ def cmd_status():
     return 0
 
 
+def lock_held():
+    import fcntl
+    path = os.path.join(os.path.dirname(control_path()), "daemon.lock")
+    try:
+        with open(path, "a") as handle:
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.flock(handle, fcntl.LOCK_UN)
+    except FileNotFoundError:
+        return False
+    except OSError:
+        return True
+    return False
+
+
 def cmd_stop(clear):
     if running():
         call({"op": "stop", "clear": clear}, timeout=15.0)
+        # Wait until it has really exited, so a restart never races the old daemon's lock.
+        deadline = time.time() + 5
+        while lock_held() and time.time() < deadline:
+            time.sleep(0.05)
         return 0
     if clear:
         # No daemon: clear its leftovers directly so uninstall always leaves a clean sidebar.
