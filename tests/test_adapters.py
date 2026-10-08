@@ -228,6 +228,17 @@ class HermesTest(EnvCase):
         self.child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"],
                                       env=dict(os.environ, HERDR_PANE_ID="w9:p1"),
                                       stdin=subprocess.DEVNULL)
+        # Popen can return before the kernel has set up the new program's environment.
+        deadline = time.time() + 5
+        while b"HERDR_PANE_ID" not in self.environ() and time.time() < deadline:
+            time.sleep(0.01)
+
+    def environ(self):
+        try:
+            with open("/proc/%d/environ" % self.child.pid, "rb") as handle:
+                return handle.read()
+        except OSError:
+            return b""
 
     def tearDown(self):
         self.child.kill()

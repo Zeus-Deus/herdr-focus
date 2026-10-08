@@ -8,7 +8,7 @@ A [Herdr](https://herdr.dev) plugin that makes the agent sidebar tell you what n
   **Done**, **Unread** or **Idle**. Working rows fade; rows that need you stand out.
 - **Watch eye 👁.** Shows while an agent's background watches run (PR checks, polling loops),
   even after the agent itself went idle. Dev servers don't count.
-- **Triage.** Mark unread, settle (hide) finished work, snooze, pin, undo.
+- **Triage.** Mark unread, settle finished work (it drops to the bottom), snooze, pin, undo.
 - **Workspace summary.** Spaces show `Needs you`, `2 done`, `Working` and the eye.
 - **Titles.** The agent's own session title (Claude, Codex, OpenCode, Hermes), else the first
   prompt. Optionally from a model you pick.
@@ -39,19 +39,22 @@ Removes the plugin, its config block and its state. Your other settings stay as 
 | --- | --- |
 | `prefix+a` | open the menu: all agents, act on any of them |
 | `prefix+u` | mark the current agent unread / read |
-| `prefix+shift+s` | settle it (hide it from the list) / bring it back |
+| `prefix+shift+s` | settle it (move it to the bottom, dimmed) / bring it back |
 | `prefix+i` | jump to the next agent that needs you |
 | `prefix+shift+u` | undo |
 
 In the menu: `↑↓` pick, `enter` go to it, `u` unread, `s` settle, `z` snooze, `p` pin,
-`w` watch, `r` rename, `g` new title, `h` show settled, `A` settle all idle, `U` undo, `q` close.
+`w` watch, `r` rename, `g` new title, `h` collapse / show settled, `A` settle all idle, `U` undo, `q` close.
 
 ## How to use it
 
 - A finished agent shows **Done** until you look at it. Opened one by accident? Press
   `prefix+u` to mark it unread again.
-- Done with a result? Settle it (`prefix+shift+s`). It comes back on its own when the agent
-  starts working again. Snooze hides it until a time you pick.
+- Done with a result? Settle it (`prefix+shift+s`). It moves to the bottom, dimmed, and comes
+  back up on its own when the agent starts working again. Snooze does the same until a time
+  you pick.
+- Too many settled rows? `h` in the menu collapses them; the Agents header then shows
+  `focus · 3 settled`. The menu always lists them, so you can unsettle from there.
 - You can't settle or snooze an agent that is working or waiting for you.
 - Pin what you keep coming back to; it stays on top.
 - The agent runs a watch you care about but the plugin can't see it? Press `w` in the menu

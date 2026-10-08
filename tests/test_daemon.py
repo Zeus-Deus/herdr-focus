@@ -82,7 +82,7 @@ class DaemonTest(unittest.TestCase):
         self.assertIn("ft_hot", p2)
         wait(lambda: self.herdr.workspace_tokens("w1").get("fws") == "Needs you")
         self.assertEqual(self.herdr.view["source"], "plugin:focus")
-        self.assertIn("filter", self.herdr.view)
+        self.assertNotIn("filter", self.herdr.view)  # settled rows show, sorted last
 
     def test_finished_turn_review_then_focus_acknowledges(self):
         self.herdr.set_status("w1:p1", "idle")
@@ -187,11 +187,18 @@ class DaemonTest(unittest.TestCase):
         wait(lambda: self.herdr.tokens("w1:p1").get("fstatus") == "@ Manual watch")
         wait(lambda: self.herdr.workspace_tokens("w1").get("fwswatch") == "@")
 
-    def test_show_hidden_toggles_the_view_filter(self):
+    def test_settled_rows_sink_and_collapse(self):
+        self.herdr.set_status("w1:p1", "idle")
+        wait(lambda: self.herdr.tokens("w1:p1").get("fstatus") == "Done")
+        self.assertTrue(self.act("toggle-settle", "w1:p1")["ok"])
+        wait(lambda: self.herdr.tokens("w1:p1").get("frank") == "8")
         self.assertTrue(self.act("show-hidden")["ok"])
-        wait(lambda: self.herdr.view and "filter" not in self.herdr.view)
+        wait(lambda: self.herdr.view and "filter" in self.herdr.view
+             and self.herdr.view["label"] == "focus · 1 settled")
+        self.act("toggle-settle", "w1:p1")
+        wait(lambda: self.herdr.view["label"] == "focus")
         self.act("show-hidden")
-        wait(lambda: self.herdr.view and "filter" in self.herdr.view)
+        wait(lambda: "filter" not in self.herdr.view)
 
     def test_restart_republishes_tokens(self):
         self.herdr.restart()

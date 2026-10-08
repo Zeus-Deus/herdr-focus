@@ -14,7 +14,7 @@ from . import cli, transport
 HELP = [
     ("enter", "focus"), ("u", "unread/read"), ("s", "settle"), ("z", "snooze"), ("p", "pin"),
     ("w", "watch"), ("r", "rename"), ("g", "new title"), ("t", "reset title"),
-    ("n", "next"), ("U", "undo"), ("h", "settled"), ("A", "settle idle"), ("q", "close"),
+    ("n", "next"), ("U", "undo"), ("h", "collapse settled"), ("A", "settle idle"), ("q", "close"),
 ]
 
 SECTION = {"needs": "NEEDS YOU", "review": "TO REVIEW", "unread": "TO REVIEW"}
@@ -25,7 +25,7 @@ class Menu:
         self.screen = screen
         self.rows = []
         self.presets = []
-        self.show_hidden = False
+        self.collapsed = False
         self.index = 0
         self.message = ""
         # The pane under the popup when it was opened: that row starts selected.
@@ -36,7 +36,7 @@ class Menu:
         current = self.rows[self.index]["key"] if self.rows else None
         self.rows = reply.get("rows", [])
         self.presets = reply.get("presets", [])
-        self.show_hidden = reply.get("show_hidden", False)
+        self.collapsed = reply.get("collapse_settled", False)
         keys = [r["key"] for r in self.rows]
         if current in keys:
             self.index = keys.index(current)
@@ -59,6 +59,8 @@ class Menu:
 
     def status_attr(self, row):
         cat = row.get("category")
+        if row.get("hidden"):
+            return curses.A_DIM  # settled / snoozed, like the sidebar
         if cat == "needs":
             return curses.color_pair(1) | curses.A_BOLD
         if cat in ("review", "unread"):
@@ -93,8 +95,8 @@ class Menu:
             summary += " · %d need you" % needs
         if review:
             summary += " · %d done" % review
-        if self.show_hidden:
-            summary += " · showing settled"
+        if self.collapsed:
+            summary += " · settled collapsed in the sidebar"
         self.put(0, 6, summary, curses.A_DIM)
         self.put(1, 0, "─" * w, curses.A_DIM)
         top = 2

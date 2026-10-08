@@ -75,7 +75,7 @@ command = ["python3", "-m", "focus", "action"]
 
 [[actions]]
 id = "show-settled"
-title = "Focus: show / hide settled agents"
+title = "Focus: collapse / show settled agents"
 command = ["python3", "-m", "focus", "action"]
 
 [[actions]]

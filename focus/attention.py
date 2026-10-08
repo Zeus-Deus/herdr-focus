@@ -14,6 +14,7 @@ QUIET = {WORKING, MONITORING, UNKNOWN}
 
 ATTENTION_RANK = {NEEDS: "1", REVIEW: "2", UNREAD: "2", IDLE: "3", UNKNOWN: "3",
                   MONITORING: "4", WORKING: "5"}
+PARKED_RANK = "8"
 
 
 def is_snoozed(record, now):
@@ -113,7 +114,9 @@ def title_slot(cat, record, focused, now):
     return "plain"
 
 
-def rank(cat, record, layout):
+def rank(cat, record, layout, parked=False):
+    if parked:
+        return PARKED_RANK  # settled and snoozed rows sit below everything else
     if record.get("pinned"):
         return "0"
     if layout == "attention":
@@ -136,14 +139,15 @@ def project(record, status, focused, watches, title, now, glyphs, layout="stable
     text = title
     if record.get("pinned") and text:
         text = "%s %s" % (glyphs["pin"], text)
+    parked = is_parked(record, now) and cat != NEEDS
     tokens = {
         "ft_hot": text if slot == "hot" else None,
         "ft": text if slot == "plain" else None,
         "ft_quiet": text if slot == "quiet" else None,
         "fstatus": status_label(cat, record, watches, now, glyphs, show_elapsed),
         "fwatch": watch_badge(cat, record, watches, glyphs),
-        "frank": rank(cat, record, layout),
-        "fhide": "1" if (is_parked(record, now) and cat != NEEDS) else None,
+        "frank": rank(cat, record, layout, parked),
+        "fhide": "1" if parked else None,
     }
     return cat, tokens
 

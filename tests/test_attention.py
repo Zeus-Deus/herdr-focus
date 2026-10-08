@@ -78,6 +78,11 @@ class ProjectionTest(unittest.TestCase):
         self.assertIsNone(self.project("idle", rec(snoozed_until=NOW - 1))[1]["fhide"])
         self.assertIsNone(self.project("blocked", rec(settled=True))[1]["fhide"])
 
+    def test_parked_rows_sort_last_even_when_pinned(self):
+        self.assertEqual(self.project("idle", rec(settled=True, pinned=True))[1]["frank"], "8")
+        self.assertEqual(self.project("idle", rec(pinned=True))[1]["frank"], "0")
+        self.assertNotEqual(self.project("blocked", rec(settled=True))[1]["frank"], "8")
+
     def test_parked_label_wins_over_review(self):
         record = rec(unread=True, unread_reason="manual", snoozed_until=NOW + 3600)
         self.assertEqual(self.project("idle", record)[1]["fstatus"], "Snoozed 1h")

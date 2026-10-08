@@ -25,7 +25,7 @@ Priority, first match wins:
 | --- | --- | --- | --- |
 | Needs you | Herdr status `blocked` | `Needs you 2m` (red, bold) | bold |
 | Working | Herdr status `working` | `Working 3m` (amber) | dim |
-| Parked | settled or snoozed | `Settled`, `Snoozed 1h` | dim, row hidden from the Agents view |
+| Parked | settled or snoozed | `Settled`, `Snoozed 1h` | dim, row sorted below every other row |
 | Done | Herdr `done`, or a turn finished while you were in another pane | `Done` (green, bold) | bold |
 | Unread | marked unread by you, or woken from a snooze | `Unread`, `Woke` (green, bold) | bold |
 | Watching | live classified watch tasks, or manual watch | `<eye> Watching 2`, `<eye> Manual watch` (cyan) | dim |
@@ -35,6 +35,10 @@ Priority, first match wins:
 - The focused pane never recedes.
 - Watches are shown next to any other state: `Done · <eye> 2` means the result is ready and
   two watches are still running. The eye clears only when the last watch ends.
+- Parked rows stay in the Agents view, sorted last (even when pinned). Collapsing them
+  (menu `h`) filters them out and the view label becomes `focus · N settled` (snoozed rows
+  count too). Herdr's view API has no section headers, so this is the closest to a
+  collapsible "Settled" group a plugin can draw.
 - Elapsed time appears only after the daemon has seen the transition. No fabricated times.
 - Workspace rollup: `Needs you` / `2 need you`, else `N done`, else `Working`; plus `<eye> N`.
 
@@ -47,7 +51,7 @@ Priority, first match wins:
 | `working` or `blocked` starts | settled/snoozed rows come back; manual unread clears on new work |
 | mark read on a `done` row | stores the acknowledged `state_change_seq`; Herdr focus is not touched |
 | settle | refused for Needs you and Working; acknowledges the result; never stops processes |
-| unsettle | back in the list, protected from auto-settle until new activity |
+| unsettle | back in its place, protected from auto-settle until new activity |
 | snooze | refused for Needs you and Working; wakes at the deadline as `Woke` |
 | pin | sorts first; pinned rows are never auto-settled |
 | watch | manual eye for providers without task evidence; labelled "Manual watch" |

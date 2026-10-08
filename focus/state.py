@@ -70,7 +70,7 @@ class Store:
         self.path = os.path.join(directory, "state.json")
         self.records = {}
         self.undo = []
-        self.view = {"show_hidden": False}
+        self.view = {"collapse_settled": False}
         self.title_cache = {}
         self.dirty = False
         self._load()

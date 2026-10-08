@@ -61,13 +61,17 @@ def resolve_glyphs(config):
     return out
 
 
-def view_query(source, show_hidden, layout):
+def view_query(source, collapsed, layout, parked=0):
+    """Settled and snoozed rows sort last (frank); collapsed, they are filtered out and
+    the view label counts them."""
     sort = [{"field": {"token": "frank"}, "order": "asc"}]
     if layout == "attention":
         sort.append({"field": "state_change_seq", "order": "desc"})
     sort += [{"field": "workspace_order"}, {"field": "tab_order"}, {"field": "pane_order"}]
     params = {"source": source, "label": "focus", "sort": sort}
-    if not show_hidden:
+    if collapsed:
+        if parked:
+            params["label"] = "focus · %d settled" % parked
         params["filter"] = {"op": "any", "filters": [
             {"op": "not", "filter": {"op": "exists", "field": {"token": "fhide"}}},
             {"op": "eq", "field": "status", "value": "blocked"},
@@ -109,6 +113,7 @@ class Daemon:
         self.published = {}         # pane_id -> {token: value}
         self.published_ws = {}      # workspace_id -> {token: value}
         self.rows = {}              # pane_id -> row dict for the menu and actions
+        self.view_sent = None       # last agent.view.set params
         self.intents = {}           # record key -> (checked_at, messages)
         self.sources = {}           # record key -> (checked_at, session value, source)
         self.natives = {}           # record key -> (checked_at, agent's own title)
@@ -225,13 +230,17 @@ class Daemon:
         self.status_sub = transport.Subscription(subs, self.socket_path)
         self.selector.register(self.status_sub, selectors.EVENT_READ, "status")
 
-    def apply_view(self):
+    def apply_view(self, force=True):
         if not self.config["sidebar"]["agent_view"]:
             self.request("agent.view.clear", {"source": self.source})
+            self.view_sent = None
             return
-        params = view_query(self.source, self.store.view.get("show_hidden"),
-                            self.config["sidebar"]["layout"])
-        self.request("agent.view.set", params)
+        parked = sum(1 for r in self.rows.values() if (r.get("tokens") or {}).get("fhide"))
+        params = view_query(self.source, self.store.view.get("collapse_settled"),
+                            self.config["sidebar"]["layout"], parked)
+        if force or params != self.view_sent:
+            self.view_sent = params
+            self.request("agent.view.set", params)
 
     def request(self, method, params):
         try:
@@ -472,6 +481,8 @@ class Daemon:
             workspace_id = workspace["workspace_id"]
             tokens = A.rollup(per_workspace.get(workspace_id, []), self.glyphs)
             self.report_workspace(workspace_id, tokens)
+        if self.store.view.get("collapse_settled"):
+            self.apply_view(force=False)  # keep the "N settled" count current
 
     def report_pane(self, pane_id, tokens):
         current = self.published.get(pane_id)
@@ -530,10 +541,11 @@ class Daemon:
             self.schedule_refresh(0)
             return "Undid: %s" % label if label else "Nothing to undo"
         if action == "show-hidden":
-            self.store.view["show_hidden"] = not self.store.view.get("show_hidden")
+            collapsed = not self.store.view.get("collapse_settled")
+            self.store.view["collapse_settled"] = collapsed
             self.mark_dirty()
             self.apply_view()
-            return "Showing settled and snoozed" if self.store.view["show_hidden"] else "Hiding settled and snoozed"
+            return "Settled agents collapsed" if collapsed else "Settled agents shown at the bottom"
         if action == "next":
             return self.focus_next(request.get("pane_id"))
         if action == "settle-idle":
@@ -665,7 +677,7 @@ class Daemon:
             "agents": len(self.rows), "records": len(self.store.records),
             "titles": titles.env_summary(self.provider),
             "layout": self.config["sidebar"]["layout"],
-            "show_hidden": bool(self.store.view.get("show_hidden")),
+            "collapse_settled": bool(self.store.view.get("collapse_settled")),
             "glyphs": self.glyphs, "config_error": self.config_error,
             "undo": [u["label"] for u in self.store.undo[-5:]],
             "title_errors": len(self.title_errors),
@@ -686,7 +698,7 @@ class Daemon:
                 reply = {"ok": True, "message": self.act(request)}
             elif op == "rows":
                 reply = {"ok": True, "rows": self.menu_rows(), "presets": triage.snooze_presets(time.time()),
-                         "show_hidden": bool(self.store.view.get("show_hidden")),
+                         "collapse_settled": bool(self.store.view.get("collapse_settled")),
                          "glyphs": self.glyphs}
             elif op == "status":
                 reply = {"ok": True, "status": self.status()}

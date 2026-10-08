@@ -7,7 +7,7 @@
 # attention rows that need you rise to the top, most recent change first
 # shelf     like stable, but working and watching rows sink to the bottom
 layout = "stable"
-# Own the Agents view (hides settled/snoozed rows; "Focus: show / hide settled" toggles it).
+# Own the Agents view (settled/snoozed rows sort last; "Focus: collapse / show settled" hides them).
 # Herdr allows one owner; set false if another plugin manages the Agents view.
 agent_view = true
 # Elapsed time on Working / Needs you / Idle labels. Never shown when the start is unknown.
