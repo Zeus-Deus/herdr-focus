@@ -1,0 +1,11 @@
+{
+ "model": "claude haiku via `claude -p` (recorded run)",
+ "titles": {
+  "can you fix the checkout redirect loop that happens right after login?": "Fix checkout redirect loop",
+  "review the payment webhook retries and tighten idempotency keys": "Fix webhook retry idempotency",
+  "please watch the CI checks on PR 412 and tell me when they go green": "Watch PR 412 CI green",
+  "add rate limiting to the public search endpoint": "Rate limit search endpoint",
+  "let's explore a cleanup of the config parser module": "Config parser cleanup",
+  "draft the 0.9 release notes from the merged pull requests": "Draft 0.9 release notes"
+ }
+}

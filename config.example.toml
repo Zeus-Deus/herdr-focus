@@ -1,0 +1,60 @@
+# Herdr Focus configuration. Copy to the plugin config dir:
+#   cp config.example.toml "$(herdr plugin config-dir focus)/config.toml"
+# then run the "Focus: reload config" action. Every key is optional.
+
+[sidebar]
+# stable    pinned rows first, then Herdr's workspace/tab/pane order (rows never jump)
+# attention rows that need you rise to the top, most recent change first
+# shelf     like stable, but working and watching rows sink to the bottom
+layout = "stable"
+# Own the Agents view (hides settled/snoozed rows; "Focus: show / hide settled" toggles it).
+# Herdr allows one owner; set false if another plugin manages the Agents view.
+agent_view = true
+# Elapsed time on Working / Needs you / Idle labels. Never shown when the start is unknown.
+elapsed = true
+
+[glyphs]
+# "auto" uses Nerd Font glyphs when fc-list finds a Nerd Font, else plain Unicode.
+watch = "auto"    # e.g. "" (Nerd Font eye) or "◉"
+pin = "auto"      # e.g. "" or "◆"
+
+[triage]
+# Settle idle, read, unpinned, unwatched agents after this many idle days. 0 = never.
+auto_settle_days = 0
+# Focusing a pane acknowledges its finished result. Herdr's focus events carry no client
+# identity, so focus from any attached client counts. Manual "unread" is never cleared by focus.
+ack_on_focus = true
+undo_depth = 20
+
+[titles]
+enabled = true
+# none     local fallback titles only: the agent's own terminal title, else a trimmed first
+#          prompt. Nothing leaves this machine.
+# command  run a one-shot CLI. The prompt (first user messages, secrets redacted, at most
+#          context_chars) is written to stdin; the first line of stdout is the title.
+#          It runs in a private temp dir with HERDR_* variables removed.
+# openai   POST to an OpenAI-compatible /chat/completions endpoint.
+# With command/openai, prompt excerpts leave the machine if the backend is remote.
+backend = "none"
+command = ["claude", "-p", "--model", "haiku", "--tools", "", "--no-session-persistence", "--strict-mcp-config"]
+# Codex alternative (reads the prompt from stdin with "-"; not exercised in this plugin's
+# tests, so check its output is a single line with your Codex version):
+# command = ["codex", "exec", "--skip-git-repo-check", "--ephemeral", "-s", "read-only", "-"]
+max_chars = 32
+context_chars = 2000
+timeout_seconds = 45
+# Startup budget: at most this many backend calls per minute (no rename storms).
+max_per_minute = 4
+
+[titles.openai]
+base_url = "https://api.openai.com/v1"
+model = "gpt-4.1-nano"
+# Name of the environment variable holding the key; the key itself never goes in this file.
+api_key_env = "OPENAI_API_KEY"
+
+[monitoring]
+# Background commands matching any of these are services, never watches (no eye).
+# Setting this list replaces the defaults (dev servers, http.server, docker compose up, ...).
+# service_patterns = ['\bnpm\s+run\s+dev\b']
+# Treat task evidence older than this as stale even without an end record.
+max_task_hours = 6

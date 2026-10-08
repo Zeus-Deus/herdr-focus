@@ -1,0 +1,26 @@
+# Herdr Focus sidebar rows, for people who keep their own [ui.sidebar.*] tables.
+# `python3 -m focus install-config` writes exactly this block (plus key bindings) when you
+# have no sidebar tables of your own. To use it by hand, merge these rows into yours.
+#
+# Tokens the plugin reports (missing tokens and their separators disappear):
+#   $ft_hot / $ft / $ft_quiet  the title; exactly one is set: needs-you/done (bold),
+#                              idle (plain), working/watching/parked (dim)
+#   $fstatus                   Needs you 2m, Working 3m, Done, Unread, Woke, <eye> Watching 2,
+#                              <eye> Manual watch, Settled, Snoozed 1h, Idle 5m, Unknown
+#   $fwatch                    <eye> N beside another status (e.g. Done with a PR watch running)
+#   $fws / $fwswatch           workspace rollup: Needs you, 2 need you, 1 done, Working; <eye> N
+# Wider sidebars can add the provider back, e.g. append { token = "agent", dim = true } to row 2.
+
+[ui.sidebar.agents]
+row_gap = 0
+rows = [
+  ["state_icon", { token = "$ft_hot", bold = true }, "$ft", { token = "$ft_quiet", dim = true }],
+  [{ token = "$fstatus", rules = [{ starts_with = "Needs", fg = "#f16769", bold = true }, { contains = "need you", fg = "#f16769", bold = true }, { starts_with = "Done", fg = "#52c585", bold = true }, { contains = " done", fg = "#52c585", bold = true }, { starts_with = "Unread", fg = "#52c585", bold = true }, { starts_with = "Woke", fg = "#52c585", bold = true }, { contains = "orking", fg = "#e9b452" }, { contains = "atch", fg = "#6bcaca" }, { starts_with = "Idle", dim = true }, { starts_with = "Settled", dim = true }, { starts_with = "Snoozed", dim = true }, { starts_with = "Unknown", dim = true }] }, { token = "$fwatch", fg = "#6bcaca" }, { token = "workspace", dim = true }],
+]
+
+[ui.sidebar.spaces]
+row_gap = 0
+rows = [
+  ["state_icon", "workspace", { token = "$fws", rules = [{ starts_with = "Needs", fg = "#f16769", bold = true }, { contains = "need you", fg = "#f16769", bold = true }, { starts_with = "Done", fg = "#52c585", bold = true }, { contains = " done", fg = "#52c585", bold = true }, { starts_with = "Unread", fg = "#52c585", bold = true }, { starts_with = "Woke", fg = "#52c585", bold = true }, { contains = "orking", fg = "#e9b452" }, { contains = "atch", fg = "#6bcaca" }, { starts_with = "Idle", dim = true }, { starts_with = "Settled", dim = true }, { starts_with = "Snoozed", dim = true }, { starts_with = "Unknown", dim = true }] }, { token = "$fwswatch", fg = "#6bcaca" }],
+  [{ token = "branch", dim = true }, "git_status"],
+]

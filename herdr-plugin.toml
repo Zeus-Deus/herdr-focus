@@ -1,0 +1,102 @@
+id = "focus"
+name = "Focus"
+version = "0.1.0"
+min_herdr_version = "0.9.1"
+description = "Attention layer for agent sidebar rows: clean titles, unread/settle triage, background watches"
+platforms = ["linux", "macos"]
+
+# Starts the one resident daemon after Herdr restores the session (no-op if it runs).
+[[startup]]
+command = ["python3", "-m", "focus", "start"]
+
+[[actions]]
+id = "menu"
+title = "Focus: attention menu"
+contexts = ["pane"]
+command = ["python3", "-m", "focus", "action"]
+
+[[actions]]
+id = "unread"
+title = "Focus: mark unread / read"
+contexts = ["pane"]
+command = ["python3", "-m", "focus", "action"]
+
+[[actions]]
+id = "settle"
+title = "Focus: settle / unsettle"
+contexts = ["pane"]
+command = ["python3", "-m", "focus", "action"]
+
+[[actions]]
+id = "pin"
+title = "Focus: pin / unpin"
+contexts = ["pane"]
+command = ["python3", "-m", "focus", "action"]
+
+[[actions]]
+id = "snooze"
+title = "Focus: snooze for an hour"
+contexts = ["pane"]
+command = ["python3", "-m", "focus", "action"]
+
+[[actions]]
+id = "wake"
+title = "Focus: wake"
+contexts = ["pane"]
+command = ["python3", "-m", "focus", "action"]
+
+[[actions]]
+id = "watch"
+title = "Focus: manual watch on / off"
+contexts = ["pane"]
+command = ["python3", "-m", "focus", "action"]
+
+[[actions]]
+id = "next"
+title = "Focus: next agent that needs you"
+command = ["python3", "-m", "focus", "action"]
+
+[[actions]]
+id = "undo"
+title = "Focus: undo last triage"
+command = ["python3", "-m", "focus", "action"]
+
+[[actions]]
+id = "title-regenerate"
+title = "Focus: generate a new title"
+contexts = ["pane"]
+command = ["python3", "-m", "focus", "action"]
+
+[[actions]]
+id = "title-reset"
+title = "Focus: reset title"
+contexts = ["pane"]
+command = ["python3", "-m", "focus", "action"]
+
+[[actions]]
+id = "show-settled"
+title = "Focus: show / hide settled agents"
+command = ["python3", "-m", "focus", "action"]
+
+[[actions]]
+id = "settle-idle"
+title = "Focus: settle every idle agent"
+command = ["python3", "-m", "focus", "action"]
+
+[[actions]]
+id = "reload"
+title = "Focus: reload config"
+command = ["python3", "-m", "focus", "action"]
+
+[[actions]]
+id = "restart"
+title = "Focus: restart daemon"
+command = ["python3", "-m", "focus", "action"]
+
+[[panes]]
+id = "menu"
+title = "focus"
+placement = "popup"
+width = "84%"
+height = "70%"
+command = ["python3", "-m", "focus", "menu"]
