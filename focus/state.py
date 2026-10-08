@@ -35,7 +35,8 @@ def new_record(key):
         "title": None,
         "title_owner": None,        # "manual" | "generated" | "fallback"
         "title_input": None,        # hash of the context the generated title came from
-        "title_generation": 0,      # bumped on every ownership change; late results compare it
+        "title_generation": 0,
+        "title_requested": False,   # user asked for a model title: it beats the agent's own      # bumped on every ownership change; late results compare it
         "status": None,
         "status_since": None,
         "last_live": None,

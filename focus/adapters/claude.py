@@ -1,5 +1,6 @@
 """Claude Code: transcripts under ~/.claude/projects/<slug>/<session>.jsonl.
 
+Titles: Claude writes its own `ai-title` records; `/rename` writes `custom-title`.
 Background-task evidence is structured, so watches are detected, not guessed:
   start   assistant tool_use Bash{run_in_background:true} or Monitor, then the matching
           tool_result's toolUseResult.backgroundTaskId / taskId
@@ -8,11 +9,13 @@ Background-task evidence is structured, so watches are detected, not guessed:
 """
 
 import glob
-import json
 import os
 import re
 
+from .common import Tail, first_texts, jsonl, text_of, timestamp
+
 SUPPORTS_TASKS = True
+NATIVE_TITLES = True  # the agent names its own sessions
 
 _TASK_ID = re.compile(r"<task-id>([^<]+)</task-id>")
 _STATUS = re.compile(r"<status>([^<]+)</status>")
@@ -24,7 +27,7 @@ def projects_root():
     return os.path.join(os.path.expanduser("~"), ".claude", "projects")
 
 
-def transcript(session):
+def locate(session, pane=None):
     if not session:
         return None
     value = session.get("value") or ""
@@ -36,98 +39,71 @@ def transcript(session):
     return matches[0] if matches else None
 
 
-def _text(content):
-    if isinstance(content, str):
-        return content
-    if isinstance(content, list):
-        parts = [c.get("text", "") for c in content
-                 if isinstance(c, dict) and c.get("type") == "text"]
-        if len(parts) == len(content):
-            return "\n".join(parts)
-    return None  # tool results and images are not user intent
-
-
-def _is_intent(record):
+def _intent(record):
     if record.get("type") != "user" or record.get("isMeta") or record.get("isSidechain"):
         return None
     if (record.get("origin") or {}).get("kind"):
         return None  # task notifications and other synthetic turns
-    text = _text((record.get("message") or {}).get("content"))
-    if not text:
+    content = (record.get("message") or {}).get("content")
+    if isinstance(content, list) and any(
+            isinstance(c, dict) and c.get("type") not in ("text",) for c in content):
+        return None  # tool results and images are not user intent
+    text = text_of(content).strip()
+    if text.startswith(("<command-", "<local-command", "<task-notification",
+                        "<system-reminder", "Caveat:", "[Request interrupted")):
         return None
-    stripped = text.lstrip()
-    if stripped.startswith(("<command-", "<local-command", "<task-notification",
-                            "<system-reminder", "Caveat:", "[Request interrupted")):
-        return None
-    return text.strip()
+    return text
 
 
-def user_messages(path, limit_chars=2000, max_messages=3):
-    out, total = [], 0
-    try:
-        with open(path, encoding="utf-8", errors="replace") as handle:
-            for line in handle:
-                if '"user"' not in line:
-                    continue
-                try:
-                    record = json.loads(line)
-                except ValueError:
-                    continue
-                text = _is_intent(record)
-                if text:
-                    out.append(text[: limit_chars - total])
-                    total += len(out[-1])
-                    if total >= limit_chars or len(out) >= max_messages:
-                        break
-    except OSError:
-        return []
-    return out
+def user_messages(source, limit_chars=2000, max_messages=3):
+    texts = (_intent(r) for r in jsonl(source) if r.get("type") == "user")
+    return first_texts(texts, limit_chars, max_messages)
+
+
+def title(source):
+    """Read by TaskReader as it tails; this full scan is for one-off use."""
+    reader = TaskReader(source)
+    reader.poll(0)
+    return reader.title
 
 
 class TaskReader:
-    """Tails one transcript incrementally and keeps the set of live background tasks."""
+    """Tails one transcript: live background tasks plus Claude's own title."""
 
-    def __init__(self, path):
-        self.path = path
-        self.offset = 0
-        self.inode = None
+    def __init__(self, source):
+        self.tail = Tail(source)
         self.pending = {}   # tool_use_id -> task info awaiting its id
-        self.tasks = {}     # task id -> {"kind", "label", "started", "timeout"}
-        self._partial = b""
+        self.tasks = {}     # task id -> {"tool", "command", "label", "started", "timeout"}
+        self.ai_title = None
+        self.custom_title = None
+
+    @property
+    def title(self):
+        return self.custom_title or self.ai_title
 
     def poll(self, now):
-        """Read new records. Returns True when the live task set changed."""
-        try:
-            stat = os.stat(self.path)
-        except OSError:
-            changed = bool(self.tasks)
-            self.tasks.clear()
-            return changed
-        if self.inode != stat.st_ino or stat.st_size < self.offset:
-            self.inode, self.offset, self._partial = stat.st_ino, 0, b""
+        """Read new records. Returns True when the live task set or the title changed."""
+        before = (set(self.tasks), self.title)
+        backlog = self.tail.inode is None
+        records, reset, mtime = self.tail.read()
+        if reset:
             self.pending.clear()
             self.tasks.clear()
-        if stat.st_size == self.offset:
-            return False
-        before = set(self.tasks)
+            backlog = True
         # Backlog lines without a timestamp are at least as old as the file's last write.
-        fallback = stat.st_mtime if self.offset == 0 else now
-        with open(self.path, "rb") as handle:
-            handle.seek(self.offset)
-            data = self._partial + handle.read()
-            self.offset = handle.tell()
-        lines = data.split(b"\n")
-        self._partial = lines.pop()
-        for raw in lines:
-            if raw.strip():
-                try:
-                    self._apply(json.loads(raw), fallback)
-                except ValueError:
-                    continue
-        return set(self.tasks) != before
+        fallback = mtime if (backlog and mtime) else now
+        for record in records:
+            self._apply(record, fallback)
+        return (set(self.tasks), self.title) != before
 
     def _apply(self, record, now):
         kind = record.get("type")
+        if kind == "ai-title" and record.get("aiTitle"):
+            self.ai_title = record["aiTitle"]
+            return
+        if kind == "custom-title" and record.get("customTitle"):
+            self.custom_title = record["customTitle"]
+            return
         message = record.get("message") or {}
         content = message.get("content")
         if kind == "assistant" and isinstance(content, list):
@@ -170,10 +146,10 @@ class TaskReader:
             if isinstance(result, dict):
                 task_id = result.get("backgroundTaskId") or result.get("taskId")
             if not task_id:
-                match = re.search(r"\b(?:ID:|task)\s+([a-z0-9]{6,})", _flat(block.get("content")))
+                match = re.search(r"\b(?:ID:|task)\s+([a-z0-9]{6,})", text_of(block.get("content")))
                 task_id = match.group(1) if match else None
             if task_id and not block.get("is_error"):
-                info["started"] = _timestamp(record) or now
+                info["started"] = timestamp(record) or now
                 self.tasks[task_id] = info
 
     def _notification(self, text):
@@ -201,22 +177,3 @@ class TaskReader:
                 continue
             out[task_id] = info
         return out
-
-
-def _flat(content):
-    if isinstance(content, str):
-        return content
-    if isinstance(content, list):
-        return " ".join(c.get("text", "") for c in content if isinstance(c, dict))
-    return ""
-
-
-def _timestamp(record):
-    stamp = record.get("timestamp")
-    if not isinstance(stamp, str):
-        return None
-    try:
-        from datetime import datetime
-        return datetime.fromisoformat(stamp.replace("Z", "+00:00")).timestamp()
-    except ValueError:
-        return None

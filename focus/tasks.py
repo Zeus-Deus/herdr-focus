@@ -20,20 +20,24 @@ class Watches:
         return any(p.search(command or "") for p in self.services)
 
     def classify(self, info):
-        if info.get("tool") == "monitor":
+        if info.get("tool") in ("monitor", "subagent"):
             return "monitor"
         return "service" if self.is_service(info.get("command")) else "monitor"
 
-    def bind(self, key, agent, path):
-        """Track a transcript for this record; returns False when the provider has no evidence."""
+    def bind(self, key, agent, source):
+        """Track this record's evidence; returns False when the provider records none."""
         adapter = adapters.for_agent(agent)
-        if not adapter or not getattr(adapter, "SUPPORTS_TASKS", False) or not path:
+        if not adapter or not getattr(adapter, "SUPPORTS_TASKS", False) or not source:
             self.readers.pop(key, None)
             return False
         current = self.readers.get(key)
-        if current is None or current[0] != path:
-            self.readers[key] = (path, adapter.TaskReader(path))
+        if current is None or current[0] != source:
+            self.readers[key] = (source, adapter.TaskReader(source))
         return True
+
+    def reader(self, key):
+        entry = self.readers.get(key)
+        return entry[1] if entry else None
 
     def drop(self, key):
         """The agent left the pane or its session changed: its evidence is stale."""

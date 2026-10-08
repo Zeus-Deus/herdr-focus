@@ -110,6 +110,8 @@ class Daemon:
         self.published_ws = {}      # workspace_id -> {token: value}
         self.rows = {}              # pane_id -> row dict for the menu and actions
         self.intents = {}           # record key -> (checked_at, messages)
+        self.sources = {}           # record key -> (checked_at, session value, source)
+        self.natives = {}           # record key -> (checked_at, agent's own title)
         self.title_errors = {}
         self.refresh_at = 0.0
         self.next_tick = 0.0
@@ -316,13 +318,47 @@ class Daemon:
             self.mark_dirty()
 
         adapter = for_agent(pane.get("agent"))
-        path = adapter.transcript(pane.get("agent_session")) if adapter else None
+        path = self.locate(key, adapter, pane, now)
         self.watches.bind(key, pane.get("agent"), path)
         self.watches.poll(key, now)
         messages = self.intent(key, adapter, path, now)
-        title = self.title_for(record, pane, messages)
+        native = self.native_title(key, adapter, path, now)
+        title = self.title_for(record, pane, messages, native, adapter)
         return {"key": key, "pane": pane, "status": status, "seq": seq, "title": title,
                 "adapter": adapter, "path": path}
+
+    def locate(self, key, adapter, pane, now):
+        """Where this agent's conversation lives; cached, retried every 10s until found."""
+        session = pane.get("agent_session") or {}
+        cached = self.sources.get(key)
+        if cached and cached[1] == session.get("value") and (cached[2] or now - cached[0] < 10):
+            return cached[2]
+        source = None
+        if adapter:
+            try:
+                source = adapter.locate(session or None, pane)
+            except Exception as exc:  # a provider store we don't understand must not stop the daemon
+                self.log("locate failed for %s: %s" % (pane.get("agent"), exc))
+        self.sources[key] = (now, session.get("value"), source)
+        return source
+
+    def native_title(self, key, adapter, source, now):
+        """The agent's own name for the conversation (Claude ai-title, Codex/OpenCode/Hermes)."""
+        if not source or not getattr(adapter, "NATIVE_TITLES", False):
+            return None
+        reader = self.watches.reader(key)
+        if reader is not None and hasattr(reader, "title"):
+            return reader.title  # tailed incrementally with the tasks
+        cached = self.natives.get(key)
+        if cached and now - cached[0] < 30:
+            return cached[1]
+        try:
+            value = adapter.title(source)
+        except Exception as exc:
+            self.log("title lookup failed: %s" % exc)
+            value = None
+        self.natives[key] = (now, value)
+        return value
 
     def intent(self, key, adapter, path, now):
         checked = self.intents.get(key)
@@ -332,17 +368,29 @@ class Daemon:
             return checked[1]
         messages = []
         if adapter and path:
-            messages = adapter.user_messages(path, self.config["titles"]["context_chars"])
+            try:
+                messages = adapter.user_messages(path, self.config["titles"]["context_chars"])
+            except Exception as exc:
+                self.log("reading prompts failed: %s" % exc)
         self.intents[key] = (now, messages)
         return messages
 
-    def title_for(self, record, pane, messages):
+    def title_for(self, record, pane, messages, native=None, adapter=None):
+        """manual > Herdr pane name > requested model title > agent's own > model > fallback."""
         max_chars = self.config["titles"]["max_chars"]
         if record.get("title_owner") == "manual" and record.get("title"):
             return record["title"]
         if pane.get("label"):
             return titles.clip(pane["label"], max_chars)   # a Herdr pane name is manual too
-        if messages and self.worker is not None and record.get("title_owner") != "generated":
+        use_agent = self.config["titles"]["agent_titles"]
+        if record.get("title_requested") and record.get("title_owner") == "generated":
+            return record["title"]
+        if native and use_agent:
+            return titles.clip(" ".join(native.split()), max_chars)
+        # Agents that name their own sessions get no model call; their title is on its way.
+        self_titled = use_agent and getattr(adapter, "NATIVE_TITLES", False)
+        if (messages and self.worker is not None and record.get("title_owner") != "generated"
+                and not self_titled):
             # Initial naming, once, from the first prompt. Later prompts never rename the
             # row; "generate a new title" does, with more of the conversation.
             context = titles.context_from(messages[:1], self.config["titles"]["context_chars"])
@@ -508,14 +556,13 @@ class Daemon:
             record["title_generation"] += 1
             message = "Renamed"
         elif action == "title-reset":
-            record.update(title=None, title_owner=None, title_input=None)
+            record.update(title=None, title_owner=None, title_input=None, title_requested=False)
             record["title_generation"] += 1
             message = "Title reset"
         elif action == "title-regenerate":
             if self.worker is None:
                 raise triage.Refused("no title backend configured (titles.backend = \"none\")")
-            record.update(title_owner=None if record.get("title_owner") == "manual"
-                          else record.get("title_owner"), title_input=None)
+            record.update(title_owner=None, title_input=None, title_requested=True)
             record["title_generation"] += 1
             self.intents.pop(row["key"], None)
             messages = self.intent(row["key"], row["adapter"], row["path"], now)

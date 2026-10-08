@@ -37,7 +37,7 @@ _SECRET = [
 ]
 
 _GENERIC = re.compile(
-    r"^(claude( code)?|codex|hermes|pi|gemini|opencode|amp|droid|cursor|bash|zsh|fish|sh|"
+    r"^(claude( code)?|codex|hermes( agent)?|pi|gemini|opencode|oc|amp|droid|cursor|copilot|bash|zsh|fish|sh|"
     r"nvim|vim|python3?|node|herdr|new (thread|chat|session)|untitled)$", re.I)
 _PROMPTY = re.compile(
     r"^(hey|hi|hello|ok(ay)?|so|please|pls|can you|could you|would you|will you|i want you to|"
@@ -90,7 +90,12 @@ def sanitize(raw, max_chars):
 def _meaningful_terminal_title(title):
     if not title:
         return None
-    # Codex appends " | <project>"; the project is already on the row.
+    # OpenCode: "OC | <title>"; Pi: "π - <name> - <dir>"; Codex: "<title> | <project>".
+    if title.startswith("OC | "):
+        title = title[5:]
+    elif title.startswith("\u03c0 - "):
+        parts = title.split(" - ")
+        title = parts[1] if len(parts) >= 3 else ""
     title = title.split(" | ")[0].strip()
     # Shell prompts (user@host:~/dir), bare paths and agent names say nothing about the work.
     if re.match(r"^[\w.-]+@[\w.-]+[:\s]", title) or title.startswith(("/", "~")):

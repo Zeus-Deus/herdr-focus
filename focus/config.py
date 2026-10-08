@@ -32,6 +32,9 @@ DEFAULTS = {
     },
     "titles": {
         "enabled": True,
+        # Use the agent's own session name when it has one (Claude Code, Codex, OpenCode,
+        # Hermes name their sessions). The model backend then names only the others.
+        "agent_titles": True,
         # none: local fallback titles only (nothing leaves the machine).
         # command: run an argv one-shot (prompt on stdin, title on stdout).
         # openai: POST to an OpenAI-compatible /chat/completions endpoint.

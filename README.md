@@ -10,7 +10,8 @@ A [Herdr](https://herdr.dev) plugin that makes the agent sidebar tell you what n
   even after the agent itself went idle. Dev servers don't count.
 - **Triage.** Mark unread, settle (hide) finished work, snooze, pin, undo.
 - **Workspace summary.** Spaces show `Needs you`, `2 done`, `Working` and the eye.
-- **Titles.** From the agent's own title or first prompt. Optionally from a model you pick.
+- **Titles.** The agent's own session title (Claude, Codex, OpenCode, Hermes), else the first
+  prompt. Optionally from a model you pick.
 
 Needs Herdr 0.9.1+ and Python 3.11+ (Linux, macOS).
 
@@ -58,7 +59,8 @@ In the menu: `↑↓` pick, `enter` go to it, `u` unread, `s` settle, `z` snooze
 
 ## AI titles (optional)
 
-Off by default, so nothing leaves your machine. To name agents with a model, put this in
+Most agents name their sessions themselves, and Focus uses those names. For the rest you can
+let a model write titles. Off by default, so nothing leaves your machine. Put this in
 `$(herdr plugin config-dir focus)/config.toml` and run "Focus: reload config":
 
 ```toml
@@ -72,13 +74,21 @@ set yourself always wins. More options: [config.example.toml](config.example.tom
 
 ## Agents
 
-| Agent | Status, triage | Titles | Watch eye |
-| --- | --- | --- | --- |
-| Claude Code | yes | yes | automatic |
-| Codex | yes | yes | manual |
-| Hermes, OpenCode, others | yes | from the terminal title | manual |
+Status and triage work for every agent Herdr detects. Titles and the watch eye read each
+agent's own session files:
 
-Status comes from Herdr, so every agent Herdr detects works.
+| Agent | Title | Watch eye |
+| --- | --- | --- |
+| Claude Code | its own session title | automatic: background commands, Monitor |
+| Codex | its own thread name | automatic: background processes |
+| OpenCode | its own session title | automatic: background subagents |
+| Hermes | its own session title | automatic: background processes |
+| Pi, Cursor, Copilot | their name for it, else the first prompt | manual (`w`) |
+| Others | the terminal title | manual (`w`) |
+
+Dev servers (`npm run dev` and friends) never count as watches.
+
+![mixed agents](docs/screenshots/agents.png)
 
 ## More
 

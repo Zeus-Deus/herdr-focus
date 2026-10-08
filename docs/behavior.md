@@ -60,21 +60,35 @@ unwatched, not-kept-active rows.
 
 ## Background watches
 
-Claude Code writes structured records, so watches are detected, not guessed:
+Each adapter reads the agent's own records, so watches are detected, not guessed. Commands
+matching `monitoring.service_patterns` (dev servers and similar) are services, never watches.
 
-- start: `Monitor` tool use, or `Bash` with `run_in_background: true`, once its tool result
-  returns the task ID (`taskId` / `backgroundTaskId`);
-- end: a `<task-notification>` with a terminal `<status>` (completed, failed, killed,
-  stopped), a monitor "stream ended" summary, or a `TaskStop` result;
-- stale: a Monitor past its timeout, evidence older than `max_task_hours`, a relaunch.
+| Agent | Starts | Ends |
+| --- | --- | --- |
+| Claude Code | `Monitor`, or `Bash` with `run_in_background`, once the result returns the task id | `<task-notification>` with a terminal status, monitor "stream ended", `TaskStop`, Monitor timeout |
+| Codex | tool output "Process running with session ID N" (code mode: `"session_id": N`) | `item_completed` CommandExecution with `process_id` N (legacy: `write_stdin` output with an exit code) |
+| OpenCode | a child session (background `task` subagent) whose last assistant message is unfinished | that message completes |
+| Hermes | an entry in `<home>/processes.json` owned by the session | the entry goes, or its pid is dead, a zombie, or reused (start time differs) |
 
-Commands matching `monitoring.service_patterns` (dev servers and similar) are services and
-never light the eye. Codex rollouts and Hermes expose no comparable task records today, so
-those agents get the manual watch toggle only.
+Evidence also goes stale after `max_task_hours`, when the agent leaves the pane, and when
+the same conversation reappears in a new terminal (a relaunch or resume). Pi has no
+background shell; Cursor, Copilot and others record none, so they get the manual watch.
+
+## Where conversations are found
+
+From Herdr's official session reference (`agent_session`): Claude `~/.claude/projects`,
+Codex `~/.codex/sessions` (+ `state_*.sqlite` for names), OpenCode
+`~/.local/share/opencode/opencode.db` (read-only; only the session, message and part
+tables), Pi `~/.pi/agent/sessions`, Cursor `~/.cursor/projects/*/agent-transcripts`, Copilot
+`~/.copilot/session-state`. Hermes is found even without Herdr's Hermes plugin: the live
+entry in `<home>/runtime/active_sessions.json` whose process runs in the pane, then the CLI's
+per-terminal breadcrumb, across `~/.hermes` and every `~/.hermes/profiles/*`.
 
 ## Titles
 
-Order: your manual title (plugin rename or a Herdr pane name) > model title > fallback.
+Order: your manual title (plugin rename or a Herdr pane name) > a model title you asked for
+("generate a new title") > the agent's own title (`titles.agent_titles`) > model title >
+fallback. Agents that name their own sessions get no automatic model call.
 The fallback is the agent's own terminal title when it is meaningful (not a shell prompt or
 the bare agent name; Codex's ` | project` suffix is dropped), else the first prompt trimmed
 to a few words. Model titles run on one background thread with a per-minute budget, are

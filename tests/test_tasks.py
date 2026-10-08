@@ -126,10 +126,10 @@ class TranscriptCase(unittest.TestCase):
 
 
 class UnsupportedProviderTest(unittest.TestCase):
-    def test_codex_and_hermes_get_no_automatic_watches(self):
+    def test_agents_without_task_records_get_no_automatic_watches(self):
         watches = tasks.Watches(config.DEFAULTS)
-        self.assertFalse(watches.bind("k", "codex", "/tmp/x"))
-        self.assertFalse(watches.bind("k", "hermes", "/tmp/x"))
+        for agent in ("pi", "cursor", "copilot", "gemini"):
+            self.assertFalse(watches.bind("k", agent, "/tmp/x"))
         self.assertEqual(watches.count("k", NOW), 0)
 
 
@@ -161,8 +161,8 @@ class UserMessageTest(unittest.TestCase):
             self.assertEqual(codex.user_messages(path), ["review the webhook retries"])
 
     def test_transcript_lookup_rejects_odd_ids(self):
-        self.assertIsNone(claude.transcript({"kind": "id", "value": "../../etc/passwd"}))
-        self.assertIsNone(claude.transcript(None))
+        self.assertIsNone(claude.locate({"kind": "id", "value": "../../etc/passwd"}))
+        self.assertIsNone(claude.locate(None))
 
 
 if __name__ == "__main__":

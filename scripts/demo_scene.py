@@ -20,23 +20,24 @@ HERDR = os.environ.get("HERDR_BIN_PATH") or "herdr"
 SCENE = [
     ("shop", "fix/checkout-redirect", [
         ("claude", "can you fix the checkout redirect loop that happens right after login?",
-         ["working:4", "blocked"], "Checkout redirect loop fix"),
+         ["working:4", "blocked"], "Fix checkout redirect loop"),
         ("codex", "review the payment webhook retries and tighten idempotency keys",
-         ["working:5", "idle"]),
+         ["working:5", "idle"], "Webhook retry idempotency"),
     ]),
     ("api", "feat/rate-limit", [
-        ("claude", "please watch the CI checks on PR 412 and tell me when they go green",
-         ["working:4", "monitor:bmon412:gh pr checks 412 --watch",
-          "task:bwait99:until gh run view 99 --exit-status; do sleep 30; done", "idle"]),
-        ("claude", "add rate limiting to the public search endpoint",
-         ["working"], "Search endpoint rate limiting"),
+        ("opencode", "please watch the CI checks on PR 412 and tell me when they go green",
+         ["working:4", "subagent:ci412:Watch PR 412 checks", "idle"], "Watch PR 412 CI"),
+        ("claude", "add rate limiting to the public search endpoint", ["working"]),
     ]),
     ("tooling", "main", [
-        ("claude", "let's explore a cleanup of the config parser module", ["working:4", "idle"]),
+        ("hermes", "let's explore a cleanup of the config parser module",
+         ["working:4", "task:watch7:until gh run view 7 --exit-status; do sleep 30; done", "idle"],
+         "Config parser cleanup"),
     ]),
     ("docs", "release/0.9", [
-        ("claude", "draft the 0.9 release notes from the merged pull requests",
-         ["working:4", "task:bdev01:npm run dev", "idle"]),
+        ("codex", "draft the 0.9 release notes from the merged pull requests",
+         ["working:4", "task:dev:npm run dev", "task:pr9:gh pr checks 9 --watch", "idle"],
+         "Draft 0.9 release notes"),
     ]),
 ]
 

@@ -158,11 +158,13 @@ class DaemonTest(unittest.TestCase):
             handle.write(json.dumps({"type": "user", "message": {"content": "fix the login loop"}}) + "\n")
         provider = FakeProvider()
         self.daemon.worker = titles.Worker(provider, 32, 60, self.daemon.poke)
+        self.daemon.config["titles"]["agent_titles"] = False  # name Claude with the model
         from focus.adapters import claude
-        original = claude.transcript
-        claude.transcript = lambda session: transcript if session else None
+        original = claude.locate
+        claude.locate = lambda session, pane=None: transcript if session else None
         try:
-            self.daemon.intents.clear()  # forget the startup lookup that found no transcript
+            self.daemon.intents.clear()  # forget the startup lookups that found no transcript
+            self.daemon.sources.clear()
             self.herdr.emit("pane.updated", {"pane": {"pane_id": "w1:p1"}})
             wait(lambda: self.herdr.tokens("w1:p1").get("ft_quiet") == "Generated title")
             with open(transcript, "a") as handle:
@@ -176,7 +178,7 @@ class DaemonTest(unittest.TestCase):
             wait(lambda: len(provider.prompts) == 2)
             self.assertIn("also add tests", provider.prompts[1])
         finally:
-            claude.transcript = original
+            claude.locate = original
 
     def test_manual_watch_shows_the_eye(self):
         self.herdr.set_status("w1:p1", "idle")
@@ -208,9 +210,10 @@ class DaemonTest(unittest.TestCase):
             ):
                 handle.write(json.dumps(record) + "\n")
         from focus.adapters import claude
-        original = claude.transcript
-        claude.transcript = lambda session: transcript if session else None
+        original = claude.locate
+        claude.locate = lambda session, pane=None: transcript if session else None
         try:
+            self.daemon.sources.clear()
             self.herdr.set_status("w1:p1", "idle")
             self.herdr.focus("w1:p1")
             wait(lambda: self.herdr.tokens("w1:p1").get("fstatus") == "@ Watching")
@@ -220,7 +223,7 @@ class DaemonTest(unittest.TestCase):
             self.herdr.emit("pane.updated", {"pane": {"pane_id": "w1:p1"}})
             wait(lambda: self.herdr.tokens("w1:p1").get("fstatus") == "Idle")
         finally:
-            claude.transcript = original
+            claude.locate = original
 
     def test_disable_clears_everything_and_exits(self):
         self.herdr.enabled = False
