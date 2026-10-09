@@ -45,6 +45,14 @@ class FallbackTest(unittest.TestCase):
         self.assertEqual(titles.heuristic("draft the 0.9 release notes from the merged PRs", 40),
                          "Draft the 0.9 release notes")
 
+    def test_tab_names_only_when_you_named_a_one_agent_tab(self):
+        tabs = [{"tab_id": "a", "number": 11, "label": "mcp connector"},
+                {"tab_id": "b", "number": 2, "label": "2"},          # unnamed: Herdr shows the number
+                {"tab_id": "c", "number": 1, "label": "hermes"},     # only repeats the agent
+                {"tab_id": "d", "number": 4, "label": "two agents"}]
+        panes = [{"tab_id": t} for t in ("a", "b", "c", "d", "d")]
+        self.assertEqual(titles.tab_names(tabs, panes), {"a": "mcp connector"})
+
     def test_agent_name_is_the_last_resort(self):
         self.assertEqual(titles.fallback({"agent": "hermes"}, [], 40), "hermes")
 

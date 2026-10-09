@@ -105,6 +105,22 @@ def _meaningful_terminal_title(title):
     return title
 
 
+def tab_names(tabs, agent_panes):
+    """tab_id -> the name you gave a tab that holds exactly one agent.
+
+    Herdr labels an unnamed tab with its number. Names that only repeat an agent or shell
+    ("hermes", "bash") say nothing, and a tab with several agents keeps per-agent titles.
+    """
+    agents_per_tab = collections.Counter(p.get("tab_id") for p in agent_panes)
+    out = {}
+    for tab in tabs:
+        label = " ".join((tab.get("label") or "").split())
+        if (agents_per_tab.get(tab.get("tab_id")) == 1 and label
+                and label != str(tab.get("number")) and not _GENERIC.match(label)):
+            out[tab["tab_id"]] = label
+    return out
+
+
 def heuristic(message, max_chars):
     """Turn a first prompt into a readable fallback without a model."""
     line = next((l.strip() for l in message.splitlines() if l.strip()), "")

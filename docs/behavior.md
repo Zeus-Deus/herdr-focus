@@ -90,7 +90,8 @@ per-terminal breadcrumb, across `~/.hermes` and every `~/.hermes/profiles/*`.
 
 ## Titles
 
-Order: your manual title (plugin rename or a Herdr pane name) > a model title you asked for
+Order: your manual title (plugin rename, a Herdr pane name, or the name of a tab holding just
+that one agent, `titles.tab_names`) > a model title you asked for
 ("generate a new title") > the agent's own title (`titles.agent_titles`) > model title >
 fallback. Agents that name their own sessions get no automatic model call.
 The fallback is the agent's own terminal title when it is meaningful (not a shell prompt or

@@ -152,6 +152,28 @@ class DaemonTest(unittest.TestCase):
         self.assertTrue(self.act("title-reset", "w1:p1")["ok"])
         wait(lambda: self.herdr.tokens("w1:p1").get("ft_quiet") != "My own title")
 
+    def test_sessions_found_without_herdr_are_rechecked(self):
+        found = ["first"]
+        adapter = type("Adapter", (), {"locate": staticmethod(lambda session, pane=None: found[0])})
+        pane = {"pane_id": "w9:p1"}
+        self.assertEqual(self.daemon.locate("k", adapter, pane, 100), "first")
+        found[0] = "after /new"
+        self.assertEqual(self.daemon.locate("k", adapter, pane, 105), "first")
+        self.assertEqual(self.daemon.locate("k", adapter, pane, 111), "after /new")
+        named = dict(pane, agent_session={"value": "ses_1"})
+        self.assertEqual(self.daemon.locate("n", adapter, named, 100), "after /new")
+        found[0] = "elsewhere"
+        self.assertEqual(self.daemon.locate("n", adapter, named, 500), "after /new")  # Herdr's ref is final
+
+    def test_a_named_tab_titles_its_agent(self):
+        title = lambda: next((v for k, v in self.herdr.tokens("w1:p1").items() if k.startswith("ft")), None)
+        self.herdr.tabs = [{"tab_id": "w1:p1t", "workspace_id": "w1", "number": 3, "label": "mcp connector"}]
+        self.herdr.emit("pane.updated", {"pane": {"pane_id": "w1:p1"}})
+        wait(lambda: title() == "mcp connector")
+        self.herdr.tabs[0]["label"] = "3"  # name removed: Herdr shows the number again
+        self.herdr.emit("pane.updated", {"pane": {"pane_id": "w1:p1"}})
+        wait(lambda: title() != "mcp connector")
+
     def test_initial_title_once_from_the_first_prompt(self):
         transcript = os.path.join(self.tmp.name, "claude-title.jsonl")
         with open(transcript, "w") as handle:

@@ -10,8 +10,8 @@ A [Herdr](https://herdr.dev) plugin that makes the agent sidebar tell you what n
   even after the agent itself went idle. Dev servers don't count.
 - **Triage.** Mark unread, settle finished work (it drops to the bottom), snooze, pin, undo.
 - **Workspace summary.** Spaces show `Needs you`, `2 done`, `Working` and the eye.
-- **Titles.** The agent's own session title (Claude, Codex, OpenCode, Hermes), else the first
-  prompt. Optionally from a model you pick.
+- **Titles.** Your tab name if you renamed the tab, else the agent's own session title
+  (Claude, Codex, OpenCode, Hermes), else the first prompt. Optionally from a model you pick.
 
 Needs Herdr 0.9.1+ and Python 3.11+ (Linux, macOS).
 

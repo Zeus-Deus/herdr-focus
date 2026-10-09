@@ -13,6 +13,7 @@ class FakeHerdr:
         self.path = path
         self.lock = threading.RLock()
         self.workspaces = [{"workspace_id": "w1", "label": "shop"}]
+        self.tabs = []
         self.panes = {}
         self.focused = None
         self.calls = []
@@ -150,6 +151,7 @@ class FakeHerdr:
                 agents = [dict(p) for p in self.panes.values() if p.get("agent")]
                 return {"type": "session_snapshot", "snapshot": {
                     "panes": panes, "agents": agents, "workspaces": copy.deepcopy(self.workspaces),
+                    "tabs": copy.deepcopy(self.tabs),
                     "focused_pane_id": self.focused}}
             if method == "pane.report_metadata":
                 tokens = self.panes[params["pane_id"]]["tokens"]

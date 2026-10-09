@@ -31,6 +31,8 @@ enabled = true
 # Use the agent's own session name when it has one (Claude Code, Codex, OpenCode, Hermes).
 # The backend below then only names the other agents.
 agent_titles = true
+# A tab you renamed titles the agent in it (when it is the only agent in that tab).
+tab_names = true
 # none     local fallback titles only: the agent's own terminal title, else a trimmed first
 #          prompt. Nothing leaves this machine.
 # command  run a one-shot CLI. The prompt (first user messages, secrets redacted, at most

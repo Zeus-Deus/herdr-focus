@@ -114,9 +114,9 @@ class Daemon:
         self.published_ws = {}      # workspace_id -> {token: value}
         self.rows = {}              # pane_id -> row dict for the menu and actions
         self.view_sent = None       # last agent.view.set params
-        self.intents = {}           # record key -> (checked_at, messages)
+        self.intents = {}           # record key -> (checked_at, messages, source)
         self.sources = {}           # record key -> (checked_at, session value, source)
-        self.natives = {}           # record key -> (checked_at, agent's own title)
+        self.natives = {}           # record key -> (checked_at, agent's own title, source)
         self.title_errors = {}
         self.refresh_at = 0.0
         self.next_tick = 0.0
@@ -263,11 +263,14 @@ class Daemon:
         now = time.time()
         panes = {p["pane_id"]: p for p in self.snapshot.get("panes", [])}
         agents = self.snapshot.get("agents", [])
+        tab_names = titles.tab_names(self.snapshot.get("tabs", []),
+                                     [panes.get(a["pane_id"], a) for a in agents])
         live = set()
         rows = {}
         for agent in agents:
             pane = dict(panes.get(agent["pane_id"], {}))
             pane.update(agent)
+            pane["tab_name"] = tab_names.get(pane.get("tab_id"))
             row = self.reconcile_agent(pane, now)
             rows[pane["pane_id"]] = row
             live.add(row["key"])
@@ -337,10 +340,12 @@ class Daemon:
                 "adapter": adapter, "path": path}
 
     def locate(self, key, adapter, pane, now):
-        """Where this agent's conversation lives; cached, retried every 10s until found."""
+        """Where this agent's conversation lives. Cached for good once Herdr names the session;
+        found any other way (Hermes runtime files), it is re-checked every 10s since /new moves it."""
         session = pane.get("agent_session") or {}
         cached = self.sources.get(key)
-        if cached and cached[1] == session.get("value") and (cached[2] or now - cached[0] < 10):
+        settled = cached and cached[2] and session.get("value")
+        if cached and cached[1] == session.get("value") and (settled or now - cached[0] < 10):
             return cached[2]
         source = None
         if adapter:
@@ -359,21 +364,19 @@ class Daemon:
         if reader is not None and hasattr(reader, "title"):
             return reader.title  # tailed incrementally with the tasks
         cached = self.natives.get(key)
-        if cached and now - cached[0] < 30:
+        if cached and cached[2] == source and now - cached[0] < 30:
             return cached[1]
         try:
             value = adapter.title(source)
         except Exception as exc:
             self.log("title lookup failed: %s" % exc)
             value = None
-        self.natives[key] = (now, value)
+        self.natives[key] = (now, value, source)
         return value
 
     def intent(self, key, adapter, path, now):
         checked = self.intents.get(key)
-        if checked and checked[1]:
-            return checked[1]
-        if checked and now - checked[0] < 10:
+        if checked and checked[2] == path and (checked[1] or now - checked[0] < 10):
             return checked[1]
         messages = []
         if adapter and path:
@@ -381,16 +384,18 @@ class Daemon:
                 messages = adapter.user_messages(path, self.config["titles"]["context_chars"])
             except Exception as exc:
                 self.log("reading prompts failed: %s" % exc)
-        self.intents[key] = (now, messages)
+        self.intents[key] = (now, messages, path)
         return messages
 
     def title_for(self, record, pane, messages, native=None, adapter=None):
-        """manual > Herdr pane name > requested model title > agent's own > model > fallback."""
+        """manual > Herdr pane or tab name > requested model title > agent's own > model > fallback."""
         max_chars = self.config["titles"]["max_chars"]
         if record.get("title_owner") == "manual" and record.get("title"):
             return record["title"]
         if pane.get("label"):
             return titles.clip(pane["label"], max_chars)   # a Herdr pane name is manual too
+        if pane.get("tab_name") and self.config["titles"]["tab_names"]:
+            return titles.clip(pane["tab_name"], max_chars)  # so is a tab you named
         use_agent = self.config["titles"]["agent_titles"]
         if record.get("title_requested") and record.get("title_owner") == "generated":
             return record["title"]
