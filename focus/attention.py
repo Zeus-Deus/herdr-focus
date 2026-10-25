@@ -101,6 +101,34 @@ def watch_badge(cat, record, watches, glyphs):
     return None
 
 
+def client_state_labels(record, seq, watches, now, glyphs, show_elapsed=True):
+    """Let each Herdr client select its own idle/done label.
+
+    A server's last focused pane stays selected after a client switches machines.
+    Custom $fstatus tokens cannot represent that client's unread completion, but
+    native state_text selects from these display-only labels using client state.
+    Keep the legacy tokens for custom layouts and server-scoped menu/rollups.
+    """
+    # Automatic completion belongs to the native client's idle/done choice, not
+    # the server's focus history. Keep explicit human triage and legacy records.
+    if record.get("unread_reason") == "finished":
+        record = dict(record, unread=False, unread_reason=None)
+    labels = {}
+    for status in ("idle", "working", "blocked", "done", "unknown"):
+        effective = status
+        if status == "done" and (
+                (seq is not None and record.get("ack_seq") == seq)
+                or (record.get("unread") and record.get("unread_reason") != "finished")):
+            effective = "idle"
+        cat = category(effective, record, watches)
+        label = status_label(cat, record, watches, now, glyphs, show_elapsed)
+        # Parking replaces the monitoring text, so it no longer includes the eye.
+        badge_cat = IDLE if is_parked(record, now) else cat
+        badge = watch_badge(badge_cat, record, watches, glyphs)
+        labels[status] = label + (" · " + badge if badge else "")
+    return labels
+
+
 def title_slot(cat, record, focused, now):
     """Which of the three styled title tokens carries the title."""
     parked = is_parked(record, now)

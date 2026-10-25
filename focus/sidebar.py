@@ -34,7 +34,7 @@ SIDEBAR = """[ui.sidebar.agents]
 row_gap = 0
 rows = [
   ["state_icon", { token = "$ft_hot", bold = true }, "$ft", { token = "$ft_quiet", dim = true }],
-  [{ token = "$fstatus", rules = %(rules)s }, { token = "$fwatch", fg = "%(cyan)s" }, { token = "workspace", dim = true }],
+  [{ token = "state_text", rules = %(rules)s }, "machine", { token = "workspace", dim = true }],
 ]
 
 [ui.sidebar.spaces]

@@ -51,6 +51,33 @@ class SidebarConfigTest(unittest.TestCase):
         self.assertIsNone(backup2)
         self.assertEqual(self.read(), first)
 
+    def test_installed_agent_rows_identify_remote_machines(self):
+        sidebar.install(self.path)
+        rows = tomllib.loads(self.read())["ui"]["sidebar"]["agents"]["rows"]
+        tokens = [item if isinstance(item, str) else item["token"]
+                  for row in rows for item in row]
+        self.assertIn("machine", tokens)
+        self.assertIn("state_text", tokens)
+        self.assertNotIn("$fstatus", tokens)  # server focus cannot select a client's Done
+        self.assertNotIn("$fwatch", tokens)  # native labels already include the watch eye
+
+    def test_update_replaces_old_managed_rows_and_preserves_user_config(self):
+        old_rows = '[ui.sidebar.agents]\nrows = [["state_icon", "$ft", "$fstatus"]]\n'
+        with open(self.path, "w") as handle:
+            handle.write(USER + "\n" + sidebar.BEGIN + "\n" + old_rows + sidebar.END + "\n")
+        _, backup, notes = sidebar.install(self.path)
+        self.assertTrue(backup and os.path.exists(backup))
+        updated = self.read()
+        self.assertTrue(updated.startswith(USER))
+        rows = tomllib.loads(updated)["ui"]["sidebar"]["agents"]["rows"]
+        self.assertTrue(any(token == "machine" or isinstance(token, dict)
+                            and token.get("token") == "machine"
+                            for row in rows for token in row))
+        self.assertEqual(updated.count(sidebar.BEGIN), 1)
+        self.assertFalse(any("sidebar" in note for note in notes))
+        self.assertIsNone(sidebar.install(self.path)[1])
+        self.assertEqual(self.read(), updated)
+
     def test_uninstall_restores_user_text(self):
         sidebar.install(self.path)
         _, changed = sidebar.uninstall(self.path)

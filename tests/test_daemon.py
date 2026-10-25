@@ -91,6 +91,23 @@ class DaemonTest(unittest.TestCase):
         self.herdr.focus("w1:p1")
         wait(lambda: self.herdr.tokens("w1:p1").get("fstatus") == "Idle")
 
+    def test_client_done_label_survives_a_stale_server_focus(self):
+        self.herdr.focus("w1:p1")
+        self.herdr.set_status("w1:p1", "idle")
+        wait(lambda: self.herdr.tokens("w1:p1").get("fstatus") == "Idle")
+        labels = self.herdr.panes["w1:p1"].get("state_labels", {})
+        # A remote client can have left this server while its last pane stays focused.
+        # Herdr's client, not this snapshot, knows whether the completion was seen.
+        self.assertEqual(labels.get("done"), "Done")
+        self.assertEqual(labels.get("idle"), "Idle")
+        self.assertEqual(self.herdr.panes["w1:p1"]["agent_status"], "idle")
+
+    def test_title_only_report_preserves_native_state_labels(self):
+        self.assertEqual(self.herdr.panes["w1:p1"]["state_labels"]["done"], "Done")
+        self.assertTrue(self.act("pin", "w1:p1")["ok"])
+        wait(lambda: self.herdr.tokens("w1:p1").get("ft_quiet", "").startswith("^ "))
+        self.assertEqual(self.herdr.panes["w1:p1"].get("state_labels", {}).get("done"), "Done")
+
     def test_manual_unread_survives_focus(self):
         self.herdr.set_status("w1:p1", "idle")
         self.herdr.focus("w1:p1")
@@ -225,6 +242,7 @@ class DaemonTest(unittest.TestCase):
     def test_restart_republishes_tokens(self):
         self.herdr.restart()
         wait(lambda: self.herdr.tokens("w1:p1").get("fstatus") == "Working", timeout=8)
+        wait(lambda: self.herdr.panes["w1:p1"].get("state_labels", {}).get("done") == "Done")
         wait(lambda: self.herdr.view is not None)
 
     def test_relaunch_in_a_new_terminal_drops_old_watches(self):
@@ -261,6 +279,7 @@ class DaemonTest(unittest.TestCase):
         self.thread.join(5)
         self.assertFalse(self.thread.is_alive())
         self.assertEqual({k for k in self.herdr.tokens("w1:p1") if k.startswith("f")}, set())
+        self.assertEqual(self.herdr.panes["w1:p1"].get("state_labels"), {})
         self.assertIsNone(self.herdr.view)
 
     def test_unchanged_projection_sends_no_reports(self):

@@ -100,6 +100,19 @@ to a few words. Model titles run on one background thread with a per-minute budg
 cached by input hash, and are dropped if the record's title generation changed while the
 request was in flight (rename, reset, regenerate).
 
+## Remote clients
+
+Managed Agent rows use the native `state_text` token with Focus's display-only state
+labels. Herdr chooses idle versus done for each viewing client; the server's last focused
+pane is not evidence that a client is still looking at that remote machine. Labels keep
+explicit unread/settled/snoozed state and include the watch badge for each native state.
+The `machine` token identifies the endpoint even when titles and pane IDs are identical.
+
+Legacy `$fstatus`/`$fwatch` tokens, the popup menu, and workspace token rollups remain
+server-scoped. They cannot represent different clients' read acknowledgements. For a
+custom Agent layout, use `state_text` instead of `$fstatus` plus `$fwatch`; the native
+label already includes the watch eye. Updates migrate the plugin-owned block only.
+
 ## Targets
 
 Keyboard actions act on the pane Herdr reports in the invocation context. Menu actions send

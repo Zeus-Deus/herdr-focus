@@ -71,6 +71,7 @@ class FakeHerdr:
         with self.lock:
             for pane in self.panes.values():
                 pane["tokens"] = {}
+                pane["state_labels"] = {}
             for ws in self.workspaces:
                 ws["tokens"] = {}
             self.view = None
@@ -154,7 +155,11 @@ class FakeHerdr:
                     "tabs": copy.deepcopy(self.tabs),
                     "focused_pane_id": self.focused}}
             if method == "pane.report_metadata":
-                tokens = self.panes[params["pane_id"]]["tokens"]
+                pane = self.panes[params["pane_id"]]
+                if params.get("clear_state_labels"):
+                    pane["state_labels"] = {}
+                pane["state_labels"] = dict(params.get("state_labels", {}))
+                tokens = pane["tokens"]
                 for key, value in params["tokens"].items():
                     if value is None:
                         tokens.pop(key, None)

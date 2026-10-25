@@ -85,7 +85,8 @@ def clear_tokens(request, source):
     snap = snap.get("snapshot", snap)
     for pane in snap.get("panes", []):
         request("pane.report_metadata", {"pane_id": pane["pane_id"], "source": source,
-                                         "tokens": {k: None for k in PANE_TOKENS}})
+                                         "tokens": {k: None for k in PANE_TOKENS},
+                                         "clear_state_labels": True})
     for ws in snap.get("workspaces", []):
         request("workspace.report_metadata", {"workspace_id": ws["workspace_id"], "source": source,
                                               "tokens": {k: None for k in WORKSPACE_TOKENS}})
@@ -110,7 +111,8 @@ class Daemon:
         self.status_sub = None
         self.status_panes = frozenset()
         self.snapshot = None
-        self.published = {}         # pane_id -> {token: value}
+        self.published = {}         # pane_id -> {token: value}, or None when invalidated
+        self.published_labels = {}  # pane_id -> native client state labels
         self.published_ws = {}      # workspace_id -> {token: value}
         self.rows = {}              # pane_id -> row dict for the menu and actions
         self.view_sent = None       # last agent.view.set params
@@ -159,7 +161,9 @@ class Daemon:
         if old is not None:
             # The old thread keeps finishing its job; its results are re-checked like any other.
             self.stale_workers = getattr(self, "stale_workers", []) + [old]
-        self.published.clear()
+        # Invalidate token values, not pane ownership: failed cleanup must retry.
+        self.published = dict.fromkeys(self.published)
+        self.published_labels.clear()
         self.published_ws.clear()
 
     def poke(self):
@@ -198,7 +202,9 @@ class Daemon:
         self.lifecycle = transport.Subscription([{"type": t} for t in LIFECYCLE], self.socket_path)
         self.selector.register(self.lifecycle, selectors.EVENT_READ, "lifecycle")
         self.status_panes = frozenset()
-        self.published.clear()
+        # Invalidate token values, not pane ownership: failed cleanup must retry.
+        self.published = dict.fromkeys(self.published)
+        self.published_labels.clear()
         self.published_ws.clear()
         self.disconnected_since = None
         self.apply_view()
@@ -473,15 +479,19 @@ class Daemon:
             cat, tokens = A.project(record, row["status"], focused,
                                     watches, row["title"], now, self.glyphs, layout, elapsed)
             row.update(category=cat, tokens=tokens, watches=watches)
-            self.report_pane(pane_id, tokens)
+            labels = A.client_state_labels(record, row["seq"], watches, now,
+                                           self.glyphs, elapsed)
+            self.report_pane(pane_id, tokens, labels)
             per_workspace.setdefault(row["pane"].get("workspace_id"), []).append(
                 (cat, watches, bool(record.get("manual_watch"))))
         # Panes that stopped hosting an agent lose our tokens.
         for pane_id in list(self.published):
             if pane_id not in self.rows:
                 if pane_id in panes:
-                    self.report_pane(pane_id, {k: None for k in PANE_TOKENS})
+                    if not self.report_pane(pane_id, {k: None for k in PANE_TOKENS}, {}):
+                        continue  # Retain the last publication until cleanup succeeds.
                 self.published.pop(pane_id, None)
+                self.published_labels.pop(pane_id, None)
         for workspace in self.snapshot.get("workspaces", []):
             workspace_id = workspace["workspace_id"]
             tokens = A.rollup(per_workspace.get(workspace_id, []), self.glyphs)
@@ -489,17 +499,25 @@ class Daemon:
         if self.store.view.get("collapse_settled"):
             self.apply_view(force=False)  # keep the "N settled" count current
 
-    def report_pane(self, pane_id, tokens):
+    def report_pane(self, pane_id, tokens, labels):
+        """Return whether the requested metadata is already or successfully published."""
         current = self.published.get(pane_id)
         patch = {k: v for k, v in tokens.items() if current is None or current.get(k) != v}
         if current is None:
             # First report after (re)connect: clear anything a previous run left behind.
             patch = dict(tokens)
-        if not patch:
-            return
-        if self.request("pane.report_metadata",
-                        {"pane_id": pane_id, "source": self.source, "tokens": patch}) is not None:
+        labels_changed = self.published_labels.get(pane_id) != labels
+        if not patch and not labels_changed:
+            return True
+        # Herdr patches tokens, but replaces this source's presentation fields on
+        # every report. A title/rank-only token patch must retain our state labels.
+        params = {"pane_id": pane_id, "source": self.source, "tokens": patch,
+                  "state_labels": labels, "clear_state_labels": not labels}
+        if self.request("pane.report_metadata", params) is not None:
             self.published[pane_id] = dict(tokens)
+            self.published_labels[pane_id] = dict(labels)
+            return True
+        return False
 
     def report_workspace(self, workspace_id, tokens):
         current = self.published_ws.get(workspace_id)

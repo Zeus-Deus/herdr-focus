@@ -8,6 +8,10 @@ A [Herdr](https://herdr.dev) plugin that makes the agent sidebar tell you what n
   **Done**, **Unread** or **Idle**. Working rows fade; rows that need you stand out.
 - **Watch eye 👁.** Shows while an agent's background watches run (PR checks, polling loops),
   even after the agent itself went idle. Dev servers don't count.
+- **Remote machines.** Connected machines share the Agents list. Each row identifies its
+  machine, so a laptop's status and watch eye cannot be mistaken for local work. Done uses
+  Herdr's viewing-client state, even after switching away from a remote pane. Install
+  Focus on each machine to produce its titles, statuses and watch evidence.
 - **Triage.** Mark unread, settle finished work (it drops to the bottom), snooze, pin, undo.
 - **Workspace summary.** Spaces show `Needs you`, `2 done`, `Working` and the eye.
 - **Titles.** Your tab name if you renamed the tab, else the agent's own session title
@@ -23,7 +27,8 @@ curl -fsSL https://raw.githubusercontent.com/Zeus-Deus/herdr-focus/main/install.
 
 Run it again to update. It backs up `~/.config/herdr/config.toml` before adding its sidebar
 rows and keys. If you already customised the sidebar or a key is taken, it leaves yours alone
-and tells you.
+and tells you. Updates refresh Focus's managed rows too. If you maintain your own agent
+rows, add the built-in `machine` token to identify remote agents; see [docs/sidebar.toml](docs/sidebar.toml).
 
 ## Uninstall
 
